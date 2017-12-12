@@ -93,8 +93,8 @@ namespace Bot_Application1
                     {
                         string nametest = activity.Text;
                         bool keyin = nametest.StartsWith("名稱");
-                        bool reqTime = nametest.StartsWith("時間");
                         bool Test = nametest.StartsWith("測試");
+                        bool res_time = nametest.StartsWith("預約");
                         bool recent = nametest.StartsWith("查詢幾小時前所有使用者");
                         bool recent_day = nametest.StartsWith("查詢本日指定使用者");
                         bool recent_week = nametest.StartsWith("查詢本周指定使用者");
@@ -112,11 +112,11 @@ namespace Bot_Application1
                                 //{
                                 FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
                                 CreatePersonResult result_Person = await client.CreatePersonAsync("security", Global.userid);
-                                await client.AddPersonFaceAsync("security", result_Person.PersonId, url);
-
+                                AddPersistedFaceResult result_add = await client.AddPersonFaceAsync("security", result_Person.PersonId, url);                           
                                 await client.TrainPersonGroupAsync("security");
-                                var result = client.GetPersonGroupTrainingStatusAsync("security");
+                                TrainingStatus result =await client.GetPersonGroupTrainingStatusAsync("security");
                                 reply.Text = $"使用者已創立,person_id為:{result_Person.PersonId}";
+                                SQLNameRegister(Global.userid, reply);
                                 //}
                                 //catch (FaceAPIException f)
                                 //{
@@ -156,14 +156,10 @@ namespace Bot_Application1
                             Global.userid = activity.Text.Trim("名稱".ToCharArray()); //移除"名稱"
                             reply.Text = $"name set as:{Global.userid}";
                         }
-                        else if (reqTime)
-                        {
-                            TimeTemplate(reply);
-                        }
                         else if (Test)
                         {
-
-                            SQLCollectTime("2017-09-03 12:10", "2017-09-03 12:30", reply);
+                            string ChanData = activity.ChannelData.ToString();
+                            reply.Text = ChanData;
                         }
                         else if (recent)
                         {
@@ -172,6 +168,70 @@ namespace Bot_Application1
                             string timestart = DateTime.UtcNow.AddHours(8 - before).ToString("yyyy-MM-dd HH:mm");
                             SQLCollectTime(timestart, timefinish, reply);
                             //得到最近的時間
+                        }
+                        else if (res_time)
+                        {
+                            string searchid = activity.Text.Trim("預約".ToCharArray());
+                            string[] strs = {};
+                            DateTime dateValue_start;
+                            DateTime dateValue_finish;
+                            strs = searchid.Split(new string[] { "@" }, StringSplitOptions.None);
+                            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                            if (strs.Length == 3)
+                            {
+                                //foreach (string s in strs)
+                                //{
+                                //    sb.AppendLine((String.IsNullOrEmpty(s) ? "<>" : s).ToString());
+                                //}
+                                if (DateTime.TryParse(strs[1], out dateValue_start))
+                                {
+                                    if (DateTime.TryParse(strs[2], out dateValue_finish))
+                                    {
+                                        if(dateValue_finish > dateValue_start)
+                                        {
+                                            //SQLReserveTimeSearch(strs[0], reply);
+                                            if (SQLReserveTimeName(strs[0]))
+                                            {
+                                                reply.Text = ("Converted " + strs[1] + " to " + dateValue_start + ".\n\n" +
+                                           "Converted " + strs[2] + " to " + dateValue_finish + ".\n\n" +
+                                           "Name is " + strs[0] + "");
+                                            }
+                                            else
+                                            {
+                                                reply.Text = "User not found in database.";
+                                            }
+                                        }
+                                        else
+                                        {
+                                            reply.Text = "開始時間晚於結束時間，請重新輸入。";
+                                        }
+                                        
+                                    }
+                                    else
+                                    {
+                                        reply.Text = ("Can't convert.");
+                                    }
+                                }
+                                else
+                                {
+                                    reply.Text = ("Can't convert.");
+                                }
+                            }
+                            else
+                            {
+                                reply.Text = "請輸入格式:名稱@起始時間@結束時間";
+                            }
+
+                            //if (String.IsNullOrEmpty(strs[0]) || String.IsNullOrEmpty(strs[1]) || String.IsNullOrEmpty(strs[2]))
+                            //{
+                            //    reply.Text = "unsussces";
+                            //}
+                            //else
+                            //{
+                            //    reply.Text = "" + strs[0] + " reserve\n\n " + strs[1] + " to " + strs[2] + " ,sucess";
+
+                            //}
+                            //reply.Text = strs[2] + "hi";
                         }
                         else if (recent_day)
                         {
@@ -211,26 +271,6 @@ namespace Bot_Application1
             return response;
         }
 
-        //private async Task <string> ProcessLUIS(string text)
-        //{
-        //    using (LuisClient client = new LuisClient("48d2dd1c-c0e4-418b-abb9-fab10b31e5ba", "7b780ccf7f9044a2a0cfd26affd6f13b"))
-        //    {
-        //        var result = await client.Predict(text);
-        //        if(result.Intents.Count() <= 0 || result.TopScoringIntent.Name != "查匯率")
-        //        {
-        //            return "看不懂";
-        //        }
-
-        //        if(result.Entities == null || !result.Entities.Any(x=>x.Key.StartsWith("幣別")))
-        //        {
-        //            return "目前只支援日幣與美金QQ";
-        //        }
-        //        var currency = result.Entities?.Where(x => x.Key.StartsWith("幣別"))?.First().Value[0].Value;
-        //        return $"查詢的外幣是{currency},價格是xxx";
-        //    }
-
-        //}
-
         private void ImageTemplate(Activity reply, string url)
         {
             List<Attachment> att = new List<Attachment>();
@@ -248,23 +288,6 @@ namespace Bot_Application1
 
             reply.Attachments = att;
         }
-        //check
-        private void TimeTemplate(Activity reply)
-        {
-            List<Attachment> attr = new List<Attachment>();
-            attr.Add(new HeroCard()
-            {
-                Title = "Get time record",
-                Subtitle = "Select from below",
-                Buttons = new List<CardAction>()
-                    {
-                        new CardAction(ActionTypes.PostBack, "得到最近時間", value: "Recent time"),
-                        new CardAction(ActionTypes.PostBack, "輸入時段", value: $"TypeIn")
-                    }
-            }.ToAttachment());
-
-            reply.Attachments = attr;
-        }
         private void SQLCollectTime(string timestart, string timefinish, Activity reply)
         {
             try
@@ -275,10 +298,6 @@ namespace Bot_Application1
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
                 StringBuilder sqlresult = new StringBuilder();
-                //string time = activity.Text.Trim("測試".ToCharArray());
-
-                //string timestart = "2017-09-03 12:10", timefinish = "2017-09-03 12:30"; //yyyy-mm-dd h-m-s
-
 
                 using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
                 {
@@ -289,21 +308,12 @@ namespace Bot_Application1
                     sb.Append("', 110) and detecttime <= CONVERT(datetime,'");
                     sb.Append(timefinish);
                     sb.Append("', 110) order by detecttime; ");
-                    /*sb.Append("FROM [SalesLT].[ProductCategory] pc ");
-                    sb.Append("JOIN [SalesLT].[Product] p ");
-                    sb.Append("ON pc.productcategoryid = p.productcategoryid;");*/
                     String sql = sb.ToString();
 
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            //sqlresult.Append("出現時間: \n\n");
-                            //sqlresult.Append(timestart);
-                            //sqlresult.Append(" till ");
-                            //sqlresult.Append(timefinish);
-                            //sqlresult.Append("\n\n");
-
                             while (reader.Read())
                             {
                                 //Console.WriteLine("{0} {1}", reader.GetString(0), reader.GetString(1));
@@ -437,11 +447,8 @@ namespace Bot_Application1
             {
                 reply.Text = $"{ e.ToString()}";
             }
-
-
-
         }
-        private void SQLReserveTimeName(string timestart, string timefinish, string name, Activity reply)
+        private bool SQLReserveTimeName(string name)
         {
             try
             {
@@ -455,37 +462,62 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("SELECT * FROM [dbo].[reservation] WHERE detecttime >= CONVERT(datetime,'");
-                    sb.Append(timestart);
-                    sb.Append("', 110) and detecttime <= CONVERT(datetime,'");
-                    sb.Append(timefinish);
-                    sb.Append("', 110) and Person = '" + name + "' ORDER BY detecttime DESC ");
-                    //sb.Append("SELECT * FROM [dbo].[detect] WHERE Person = '"+name+"' ORDER BY detecttime DESC");
-                    /*sb.Append("FROM [SalesLT].[ProductCategory] pc ");
-                    sb.Append("JOIN [SalesLT].[Product] p ");
-                    sb.Append("ON pc.productcategoryid = p.productcategoryid;");*/
-                    String sql = sb.ToString();
+                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = '"+name+"') BEGIN " +
+                        "SELECT 'True' END ELSE BEGIN SELECT 'False' END");
 
+                    String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            //sqlresult.Append("出現時間: \n\n");
-                            //sqlresult.Append(timestart);
-                            //sqlresult.Append(" till ");
-                            //sqlresult.Append(timefinish);
-                            //sqlresult.Append("\n\n");
-
                             while (reader.Read())
                             {
-                                //Console.WriteLine("{0} {1}", reader.GetString(0), reader.GetString(1));
-                                sqlresult.Append(reader.GetString(1));
-                                sqlresult.Append(" ");
-                                sqlresult.Append(reader.GetDateTime(2).ToString("yyyy-MM-dd HH:mm:ss"));
-                                sqlresult.Append("\n\n");
-
-                                reply.Text = sqlresult.ToString();
+                                sqlresult.Append(reader.GetString(0));
                             }
+                            if (sqlresult.ToString() == "True")
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
+                            return false;
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                return false;
+            }
+        }
+        private void SQLReserveTimeCompare(string name, Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = 'Ian') BEGIN SELECT 'True' END ELSE BEGIN SELECT 'False' END");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {                      
+                                sqlresult.Append(reader.GetString(0));
+                            }
+                            reply.Text = sqlresult.ToString();
                         }
                     }
                     connection.Close();
@@ -499,7 +531,7 @@ namespace Bot_Application1
 
 
         }
-        private void SQLReserveTimeSearch(string timestart, string timefinish, string name, Activity reply)
+        private void SQLNameRegister(string name, Activity reply)
         {
             try
             {
@@ -513,37 +545,55 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("SELECT * FROM [dbo].[reservation] WHERE detecttime >= CONVERT(datetime,'");
-                    sb.Append(timestart);
-                    sb.Append("', 110) and detecttime <= CONVERT(datetime,'");
-                    sb.Append(timefinish);
-                    sb.Append("', 110) and Person = '" + name + "' ORDER BY detecttime DESC ");
-                    //sb.Append("SELECT * FROM [dbo].[detect] WHERE Person = '"+name+"' ORDER BY detecttime DESC");
-                    /*sb.Append("FROM [SalesLT].[ProductCategory] pc ");
-                    sb.Append("JOIN [SalesLT].[Product] p ");
-                    sb.Append("ON pc.productcategoryid = p.productcategoryid;");*/
+                    sb.Append("INSERT INTO [dbo].[users]([NAME]) VALUES('"+name+"')");
                     String sql = sb.ToString();
-
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            //sqlresult.Append("出現時間: \n\n");
-                            //sqlresult.Append(timestart);
-                            //sqlresult.Append(" till ");
-                            //sqlresult.Append(timefinish);
-                            //sqlresult.Append("\n\n");
-
                             while (reader.Read())
                             {
-                                //Console.WriteLine("{0} {1}", reader.GetString(0), reader.GetString(1));
-                                sqlresult.Append(reader.GetString(1));
-                                sqlresult.Append(" ");
-                                sqlresult.Append(reader.GetDateTime(2).ToString("yyyy-MM-dd HH:mm:ss"));
-                                sqlresult.Append("\n\n");
-
-                                reply.Text = sqlresult.ToString();
+                                sqlresult.Append(reader.GetString(0));
                             }
+                            reply.Text = sqlresult.ToString();
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+        private void SQLNameDelete(string name, Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = 'Ian') BEGIN SELECT 'True' END ELSE BEGIN SELECT 'False' END");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetString(0));
+                            }
+                            reply.Text = sqlresult.ToString();
                         }
                     }
                     connection.Close();
