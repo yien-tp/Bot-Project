@@ -20,6 +20,7 @@ using Microsoft.ProjectOxford.Face.Contract;
 using System.Threading;
 using System.Data.SqlClient;
 using System.Text;
+using System.Data;
 
 namespace Bot_Application1
 {
@@ -96,6 +97,7 @@ namespace Bot_Application1
                         bool keyin = nametest.StartsWith("名稱");
                         bool Test = nametest.StartsWith("測試");
                         bool res_time = nametest.StartsWith("預約");
+                        bool res_delete = nametest.StartsWith("刪除預約");
                         bool recent = nametest.StartsWith("查詢幾小時前所有使用者");
                         bool recent_day = nametest.StartsWith("查詢本日指定使用者");
                         bool recent_week = nametest.StartsWith("查詢本周指定使用者");
@@ -176,68 +178,56 @@ namespace Bot_Application1
                             System.Text.StringBuilder sb = new System.Text.StringBuilder();
                             if (strs.Length == 3)
                             {
-                                //foreach (string s in strs)
-                                //{
-                                //    sb.AppendLine((String.IsNullOrEmpty(s) ? "<>" : s).ToString());
-                                //}
                                 if (DateTime.TryParse(strs[1], out dateValue_start))
                                 {
                                     if (DateTime.TryParse(strs[2], out dateValue_finish))
                                     {
-                                        if(dateValue_finish > dateValue_start)
+                                       double s = new TimeSpan(dateValue_finish.Ticks - dateValue_start.Ticks).TotalMinutes;
+                                        if ((dateValue_finish > dateValue_start) && (s <= 300))
                                         {
-                                            //SQLReserveTimeSearch(strs[0], reply);
-                                            if (SQLReserveTimeName(strs[0]))
+                                            if (SQLReserveTimeNameCheck(strs[0]))
                                             {
                                                 if(!SQLReserveTimeIsConflict(dateValue_start, dateValue_finish, strs[0]))
                                                 {
-                                                    //reply.Text = ("Converted " + strs[1] + " to " + dateValue_start + ".\n\n" +
-                                                    //    "Converted " + strs[2] + " to " + dateValue_finish + ".\n\n" +
-                                                    //    "Name is " + strs[0] + "");
                                                     SQLReserveTimeInsert(dateValue_start, dateValue_finish, strs[0],reply);
-                                                    //reply.Text = "預約成功!請記得於預約時間使用!\n\n若無需使用請取消預約!";
+                                                    
                                                 }
                                                 else
                                                 {
-                                                    reply.Text = "Selected Time has been reserved. Please Select another Time.";
+                                                    reply.Text = "指定時間已被預約，請重新選擇。";
                                                 }
                                             }
                                             else
                                             {
-                                                reply.Text = "User not found in database.";
+                                                reply.Text = "使用者不在資料庫中，請先註冊再做預約。";
                                             }
                                         }
                                         else
                                         {
-                                            reply.Text = "開始時間晚於結束時間，請重新輸入。";
+                                            reply.Text = "開始時間晚於結束時間或輸入時間大於5小時，請重新輸入。";
                                         }
                                         
                                     }
                                     else
                                     {
-                                        reply.Text = ("Can't convert.");
+                                        reply.Text = ("日期格式錯誤，請參照範例格式。");
                                     }
                                 }
                                 else
                                 {
-                                    reply.Text = ("Can't convert.");
+                                    reply.Text = ("日期格式錯誤，請參照範例格式。");
                                 }
                             }
                             else
                             {
                                 reply.Text = "請輸入格式:名稱@起始時間@結束時間";
                             }
-
-                            //if (String.IsNullOrEmpty(strs[0]) || String.IsNullOrEmpty(strs[1]) || String.IsNullOrEmpty(strs[2]))
-                            //{
-                            //    reply.Text = "unsussces";
-                            //}
-                            //else
-                            //{
-                            //    reply.Text = "" + strs[0] + " reserve\n\n " + strs[1] + " to " + strs[2] + " ,sucess";
-
-                            //}
-                            //reply.Text = strs[2] + "hi";
+                        }
+                        else if (res_delete)
+                        {
+                            string searchid = activity.Text.Trim("刪除預約".ToCharArray());
+                            //reply.Text = SQLReserveTimeDelete(searchid);
+                            CreateButtonOne(reply,searchid);
                         }
                         else if (recent_day)
                         {
@@ -293,6 +283,32 @@ namespace Bot_Application1
             }.ToAttachment());
 
             reply.Attachments = att;
+        }
+        private void CreateButtonOne(Activity reply,string name)
+        {
+            string del_time = SQLReserveTimeDelete(name);
+            string[] strs = del_time.Split(new string[] { "@@" }, StringSplitOptions.None);
+            //reply.Text = (strs[0]+strs[1]+strs[2]);
+            List<Attachment> att = new List<Attachment>();
+            for (int i = 0; i < 3; i++)
+            {
+                att.Add(new HeroCard()
+                {
+                    Title = "請問要刪除\n\n" + strs[i] + "",
+                    Buttons = new List<CardAction>()
+                    {
+                        new CardAction(ActionTypes.PostBack,"是", value: "s"),
+                    }
+
+                }.ToAttachment());
+            }
+            reply.AttachmentLayout = AttachmentLayoutTypes.Carousel;
+            reply.Attachments = att;
+            if (strs.Length > 1)
+            {
+
+            }
+
         }
         private void SQLCollectTime(string timestart, string timefinish, Activity reply)
         {
@@ -454,7 +470,7 @@ namespace Bot_Application1
                 reply.Text = $"{ e.ToString()}";
             }
         }
-        private bool SQLReserveTimeName(string name)
+        private bool SQLReserveTimeNameCheck(string name)
         {
             try
             {
@@ -577,7 +593,7 @@ namespace Bot_Application1
                             {
                                 sqlresult.Append(reader.GetString(0));
                             }
-                            reply.Text = "Reserve Sucess";
+                            reply.Text = "預約成功!請記得於預約時間使用!\n\n若無需使用請取消預約!";
                         }
                     }
                     connection.Close();
@@ -585,8 +601,53 @@ namespace Bot_Application1
             }
             catch (SqlException e)
             {
-                //reply.Text = "Reserve Failed.";
-                reply.Text = $"{ e.ToString()}";
+                reply.Text = "資料庫寫入失敗，請確認輸入格式正確後，稍後再試。";
+                //reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+        private string SQLReserveTimeDelete(string name)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("SELECT * FROM [dbo].[reservation] WHERE Person = '"+name+"' AND StartTime >= DateAdd(HH, 8, Getdate())");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetDateTime(1).ToString("yyyy-MM-dd HH:mm"));
+                                sqlresult.Append("~");
+                                sqlresult.Append(reader.GetDateTime(2).ToString("yyyy-MM-dd HH:mm"));
+                                sqlresult.Append("@@");
+                                //return sqlresult.ToString();                                
+                            }
+                            return sqlresult.ToString();
+
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                return "error";
+                //reply.Text = "資料庫無預約資料。";
+                //reply.Text = $"{ e.ToString()}";
             }
 
 
