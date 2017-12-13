@@ -92,6 +92,7 @@ namespace Bot_Application1
                     if (activity.ChannelId == "facebook")
                     {
                         string nametest = activity.Text;
+                        bool delete_user = nametest.StartsWith("刪除使用者");
                         bool keyin = nametest.StartsWith("名稱");
                         bool Test = nametest.StartsWith("測試");
                         bool res_time = nametest.StartsWith("預約");
@@ -125,17 +126,6 @@ namespace Bot_Application1
                                 //}
                                 //faceAPI
                             }
-                            /*else if (fbData.postback.payload.StartsWith("Recent")||recent)
-                            {
-                                string timefinish = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                               
-
-                                string timestart = DateTime.Now.AddHours(-6).ToString("yyyy-MM-dd HH:mm:ss");
-
-                                SQLCollectTime(timestart, timefinish, reply);
-                                //得到最近的時間
-                            }*/
-
                             else if (fbData.postback.payload.StartsWith("TypeIn"))
                             {
 
@@ -155,6 +145,13 @@ namespace Bot_Application1
                         {
                             Global.userid = activity.Text.Trim("名稱".ToCharArray()); //移除"名稱"
                             reply.Text = $"name set as:{Global.userid}";
+                        }
+                        else if (delete_user)
+                        {
+                            string username = activity.Text.Trim("刪除使用者".ToCharArray());
+                            //TODO
+                            //SQLDELETENAME select  personid where username == username
+                            //delete api
                         }
                         else if (Test)
                         {
@@ -192,9 +189,18 @@ namespace Bot_Application1
                                             //SQLReserveTimeSearch(strs[0], reply);
                                             if (SQLReserveTimeName(strs[0]))
                                             {
-                                                reply.Text = ("Converted " + strs[1] + " to " + dateValue_start + ".\n\n" +
-                                           "Converted " + strs[2] + " to " + dateValue_finish + ".\n\n" +
-                                           "Name is " + strs[0] + "");
+                                                if(!SQLReserveTimeIsConflict(dateValue_start, dateValue_finish, strs[0]))
+                                                {
+                                                    //reply.Text = ("Converted " + strs[1] + " to " + dateValue_start + ".\n\n" +
+                                                    //    "Converted " + strs[2] + " to " + dateValue_finish + ".\n\n" +
+                                                    //    "Name is " + strs[0] + "");
+                                                    SQLReserveTimeInsert(dateValue_start, dateValue_finish, strs[0],reply);
+                                                    //reply.Text = "預約成功!請記得於預約時間使用!\n\n若無需使用請取消預約!";
+                                                }
+                                                else
+                                                {
+                                                    reply.Text = "Selected Time has been reserved. Please Select another Time.";
+                                                }
                                             }
                                             else
                                             {
@@ -493,7 +499,7 @@ namespace Bot_Application1
                 return false;
             }
         }
-        private void SQLReserveTimeCompare(string name, Activity reply)
+        private bool SQLReserveTimeIsConflict(DateTime timestart, DateTime timefinish, string name)
         {
             try
             {
@@ -507,7 +513,11 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = 'Ian') BEGIN SELECT 'True' END ELSE BEGIN SELECT 'False' END");
+                    sb.Append("IF (SELECT COUNT(Person) FROM dbo.reservation WHERE StartTime <= CONVERT(datetime,'"+timefinish+"',110) and EndTime >= CONVERT(datetime,'"+timefinish+"',110)" +
+                        " or StartTime <= CONVERT(datetime,'"+timestart+"',110) and EndTime >= CONVERT(datetime,'"+timestart+"',110)" +
+                        " or StartTime >= CONVERT(datetime,'"+timestart+"',110) and EndTime <= CONVERT(datetime,'"+timefinish+"',110)) > 0 "+
+                        " BEGIN SELECT 'True' END "+  
+                        " ELSE BEGIN SELECT 'False' END");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -517,7 +527,57 @@ namespace Bot_Application1
                             {                      
                                 sqlresult.Append(reader.GetString(0));
                             }
-                            reply.Text = sqlresult.ToString();
+                            if (sqlresult.ToString() == "True")
+                            {
+                                return true;
+                                
+                            }
+                            else
+                            {
+                                return false;
+                                
+                            }
+                            
+                        }
+                    }
+                    connection.Close();
+                    
+                }
+            }
+            catch (SqlException e)
+            {
+                return false;
+                //reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+        private void SQLReserveTimeInsert(DateTime timestart, DateTime timefinish, string name, Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("INSERT INTO [dbo].[reservation]([Person],[StartTime],[EndTime]) VALUES('" + name + "', CONVERT(smalldatetime,'"+timestart+ "',110), CONVERT(smalldatetime,'"+timefinish+"',110))");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetString(0));
+                            }
+                            reply.Text = "Reserve Sucess";
                         }
                     }
                     connection.Close();
@@ -525,6 +585,7 @@ namespace Bot_Application1
             }
             catch (SqlException e)
             {
+                //reply.Text = "Reserve Failed.";
                 reply.Text = $"{ e.ToString()}";
             }
 
