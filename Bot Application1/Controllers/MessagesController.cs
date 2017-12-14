@@ -287,28 +287,32 @@ namespace Bot_Application1
         private void CreateButtonOne(Activity reply,string name)
         {
             string del_time = SQLReserveTimeDelete(name);
-            string[] strs = del_time.Split(new string[] { "@@" }, StringSplitOptions.None);
+            string[] strs = del_time.Split(new string[] { "@@" }, StringSplitOptions.RemoveEmptyEntries);
             //reply.Text = (strs[0]+strs[1]+strs[2]);
-            List<Attachment> att = new List<Attachment>();
-            for (int i = 0; i < 3; i++)
+            if (strs[0] == "error" || String.IsNullOrEmpty(strs[0]))
             {
-                att.Add(new HeroCard()
+                reply.Text = "資料庫無此筆資料，請重新確認";
+            }
+            else
+            {
+                List<Attachment> att = new List<Attachment>();
+                foreach (string s in strs)
                 {
-                    Title = "請問要刪除\n\n" + strs[i] + "",
-                    Buttons = new List<CardAction>()
+                    att.Add(new HeroCard()
                     {
-                        new CardAction(ActionTypes.PostBack,"是", value: "s"),
-                    }
+                        Title = "請問要刪除\n\n" + s + "",
+                        Subtitle = "超過5筆則僅顯示最近5筆",
+                        Buttons = new List<CardAction>()
+                        {
+                            new CardAction(ActionTypes.PostBack,"是", value: "s"),
+                        }
 
-                }.ToAttachment());
+                    }.ToAttachment());
+                }
+                reply.AttachmentLayout = AttachmentLayoutTypes.Carousel;
+                reply.Attachments = att;
+                
             }
-            reply.AttachmentLayout = AttachmentLayoutTypes.Carousel;
-            reply.Attachments = att;
-            if (strs.Length > 1)
-            {
-
-            }
-
         }
         private void SQLCollectTime(string timestart, string timefinish, Activity reply)
         {
@@ -622,7 +626,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("SELECT * FROM [dbo].[reservation] WHERE Person = '"+name+"' AND StartTime >= DateAdd(HH, 8, Getdate())");
+                    sb.Append("SELECT Top 5 * FROM [dbo].[reservation] WHERE Person = '"+name+"' AND StartTime >= DateAdd(HH, 8, Getdate()) ORDER BY StartTime");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -636,8 +640,14 @@ namespace Bot_Application1
                                 sqlresult.Append("@@");
                                 //return sqlresult.ToString();                                
                             }
-                            return sqlresult.ToString();
-
+                            if (String.IsNullOrWhiteSpace(sqlresult.ToString()))
+                            {
+                                return "error";
+                            }
+                            else
+                            {
+                                return sqlresult.ToString();
+                            }
                         }
                     }
                     connection.Close();
