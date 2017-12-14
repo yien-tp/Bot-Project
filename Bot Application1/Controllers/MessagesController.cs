@@ -87,6 +87,23 @@ namespace Bot_Application1
                     string timestart = DateTime.UtcNow.AddDays(-7).ToShortDateString();
                     SQLCollectTime(timestart, timefinish, reply);
                 }
+                else if (activity.Text.StartsWith("delete"))
+                {
+                    string searchid = activity.Text.Trim("delete".ToCharArray());
+                    string []strs = searchid.Split(new string[] { "~" }, StringSplitOptions.RemoveEmptyEntries);
+                    DateTime dateValue_start;
+                    DateTime dateValue_finish;
+                    if (strs.Length == 2)
+                    {
+                        if (DateTime.TryParse(strs[0], out dateValue_start))
+                        {
+                            if (DateTime.TryParse(strs[1], out dateValue_finish))
+                            {
+                                SQLReserveTimeDelete(dateValue_start.ToString(),reply);
+                            }
+                        }
+                    }
+                }
                 else
                 {
                     //if(activity.ChannelId == "emulator")
@@ -286,7 +303,7 @@ namespace Bot_Application1
         }
         private void CreateButtonOne(Activity reply,string name)
         {
-            string del_time = SQLReserveTimeDelete(name);
+            string del_time = SQLReserveTimeDeleteCheck(name);
             string[] strs = del_time.Split(new string[] { "@@" }, StringSplitOptions.RemoveEmptyEntries);
             //reply.Text = (strs[0]+strs[1]+strs[2]);
             if (strs[0] == "error" || String.IsNullOrEmpty(strs[0]))
@@ -304,7 +321,7 @@ namespace Bot_Application1
                         Subtitle = "超過5筆則僅顯示最近5筆",
                         Buttons = new List<CardAction>()
                         {
-                            new CardAction(ActionTypes.PostBack,"是", value: "s"),
+                            new CardAction(ActionTypes.PostBack,"是", value: "delete"+s+""),
                         }
 
                     }.ToAttachment());
@@ -612,7 +629,7 @@ namespace Bot_Application1
 
 
         }
-        private string SQLReserveTimeDelete(string name)
+        private string SQLReserveTimeDeleteCheck(string name)
         {
             try
             {
@@ -658,6 +675,57 @@ namespace Bot_Application1
                 return "error";
                 //reply.Text = "資料庫無預約資料。";
                 //reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+        private void SQLReserveTimeDelete(string StartTime,Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                //string time = activity.Text.Trim("測試".ToCharArray());
+
+                //string timestart = "2017-09-03 12:10", timefinish = "2017-09-03 12:30"; //yyyy-mm-dd h-m-s
+
+
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("DELETE FROM [dbo].[reservation] WHERE StartTime = '"+StartTime+"'");
+                    String sql = sb.ToString();
+
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                           
+
+                            while (reader.Read())
+                            {
+                                //Console.WriteLine("{0} {1}", reader.GetString(0), reader.GetString(1));
+                                sqlresult.Append(reader.GetString(1));
+                                sqlresult.Append(" ");
+                                sqlresult.Append(reader.GetDateTime(2).ToString("yyyy-MM-dd HH:mm:ss"));
+                                sqlresult.Append("\n\n");
+                               
+                            }
+                            reply.Text = "Delete Sucess.";
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                reply.Text = $"{ e.ToString()}";
             }
 
 
