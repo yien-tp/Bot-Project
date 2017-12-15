@@ -28,7 +28,8 @@ namespace Bot_Application1
 
     {
         public static string userid;
-
+        public static Guid P_id;
+        public static string upload_name;
     }
     [BotAuthentication]
     public class MessagesController : ApiController
@@ -111,11 +112,11 @@ namespace Bot_Application1
                     {
                         string nametest = activity.Text;
                         bool delete_user = nametest.StartsWith("刪除使用者");
-                        bool keyin = nametest.StartsWith("名稱");
+                        bool keyin = nametest.StartsWith("新增名稱");
+                        bool upload = nametest.StartsWith("上傳照片");
                         bool Test = nametest.StartsWith("測試");
                         bool res_time = nametest.StartsWith("預約");
-                        bool res_delete = nametest.StartsWith("刪除預約");
-                        bool recent = nametest.StartsWith("查詢幾小時前所有使用者");
+                        bool res_delete = nametest.StartsWith("刪除預約");                    
                         bool recent_day = nametest.StartsWith("查詢本日指定使用者");
                         bool recent_week = nametest.StartsWith("查詢本周指定使用者");
                         bool recent_month = nametest.StartsWith("查詢本月指定使用者");
@@ -128,21 +129,20 @@ namespace Bot_Application1
 
                             if (fbData.postback.payload.StartsWith("Face>"))
                             {
-                                //try
-                                //{
-                                FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
-                                CreatePersonResult result_Person = await client.CreatePersonAsync("security", Global.userid);
-                                AddPersistedFaceResult result_add = await client.AddPersonFaceAsync("security", result_Person.PersonId, url);                           
-                                await client.TrainPersonGroupAsync("security");
-                                TrainingStatus result =await client.GetPersonGroupTrainingStatusAsync("security");
-                                reply.Text = $"使用者已創立,person_id為:{result_Person.PersonId}";
-                                SQLNameRegister(Global.userid, reply);
-                                //}
-                                //catch (FaceAPIException f)
-                                //{
-                                //    reply.Text=""f.ErrorMessage.ToString()"+"\n\n"+"f.ErrorCode.ToString()"";
-                                //    return new Face[0];
-                                //}
+                                try
+                                {
+                                    FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
+                                    Guid result_Person = Global.P_id;
+                                    AddPersistedFaceResult result_add = await client.AddPersonFaceAsync("security", result_Person, url);
+                                    await client.TrainPersonGroupAsync("security");
+                                    TrainingStatus result = await client.GetPersonGroupTrainingStatusAsync("security");
+                                    reply.Text = $"使用者pic已創立";
+                                   
+                                }
+                                catch (FaceAPIException f)
+                                {
+                                    reply.Text = "Pic error";
+                                }
                                 //faceAPI
                             }
                             else if (fbData.postback.payload.StartsWith("TypeIn"))
@@ -162,33 +162,64 @@ namespace Bot_Application1
                         }
                         else if (keyin)
                         {
-                            Global.userid = activity.Text.Trim("名稱".ToCharArray()); //移除"名稱"
-                            reply.Text = $"name set as:{Global.userid}";
+                            Global.userid = activity.Text.Trim("新增名稱".ToCharArray()); //移除"名稱"
+                            if (!SQLUserNameCheck(Global.userid))
+                            {
+                                try
+                                {
+                                    FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
+                                    CreatePersonResult result_Person = await client.CreatePersonAsync("security", Global.userid);
+                                    Global.P_id = result_Person.PersonId;
+                                    SQLNameRegister(Global.userid, result_Person.PersonId.ToString(), reply);
+                                    reply.Text = $"user create as:{Global.userid}";
+                                }
+                                catch (FaceAPIException f)
+                                {
+
+                                    reply.Text = "" + f.ErrorMessage + "";
+                                }
+                            }
+                            else
+                            {
+                                reply.Text = "name has been registry,select another name.";
+                            }
+
                         }
                         else if (delete_user)
                         {
+
                             string username = activity.Text.Trim("刪除使用者".ToCharArray());
-                            //TODO
+                            Guid PersonID = new Guid(SQLSelectId(username));
+                            if (SQLSelectId(username) != "error")
+                            {
+                                FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
+                                try
+                                {
+                                    await client.DeletePersonAsync("security", PersonID);
+                                    SQLPersonDelete(PersonID.ToString(), reply);
+                                }
+                                catch (FaceAPIException f)
+                                {
+                                    reply.Text = "delete failed," + f.ErrorMessage + "";
+                                }
+                            }
+                            else
+                            {
+                                reply.Text = "can't find user";
+                            }
+
                             //SQLDELETENAME select  personid where username == username
-                            //delete api
+
                         }
                         else if (Test)
                         {
                             string ChanData = activity.ChannelData.ToString();
                             reply.Text = ChanData;
                         }
-                        else if (recent)
-                        {
-                            int before = int.Parse(activity.Text.Trim("查詢幾小時前所有使用者".ToCharArray()));
-                            string timefinish = DateTime.UtcNow.AddHours(8).ToString("yyyy-MM-dd HH:mm");
-                            string timestart = DateTime.UtcNow.AddHours(8 - before).ToString("yyyy-MM-dd HH:mm");
-                            SQLCollectTime(timestart, timefinish, reply);
-                            //得到最近的時間
-                        }
                         else if (res_time)
                         {
                             string searchid = activity.Text.Trim("預約".ToCharArray());
-                            string[] strs = {};
+                            string[] strs = { };
                             DateTime dateValue_start;
                             DateTime dateValue_finish;
                             strs = searchid.Split(new string[] { "@" }, StringSplitOptions.None);
@@ -199,15 +230,15 @@ namespace Bot_Application1
                                 {
                                     if (DateTime.TryParse(strs[2], out dateValue_finish))
                                     {
-                                       double s = new TimeSpan(dateValue_finish.Ticks - dateValue_start.Ticks).TotalMinutes;
+                                        double s = new TimeSpan(dateValue_finish.Ticks - dateValue_start.Ticks).TotalMinutes;
                                         if ((dateValue_finish > dateValue_start) && (s <= 300))
                                         {
-                                            if (SQLReserveTimeNameCheck(strs[0]))
+                                            if (SQLUserNameCheck(strs[0]))
                                             {
-                                                if(!SQLReserveTimeIsConflict(dateValue_start, dateValue_finish, strs[0]))
+                                                if (!SQLReserveTimeIsConflict(dateValue_start, dateValue_finish, strs[0]))
                                                 {
-                                                    SQLReserveTimeInsert(dateValue_start, dateValue_finish, strs[0],reply);
-                                                    
+                                                    SQLReserveTimeInsert(dateValue_start, dateValue_finish, strs[0], reply);
+
                                                 }
                                                 else
                                                 {
@@ -223,7 +254,7 @@ namespace Bot_Application1
                                         {
                                             reply.Text = "開始時間晚於結束時間或輸入時間大於5小時，請重新輸入。";
                                         }
-                                        
+
                                     }
                                     else
                                     {
@@ -244,7 +275,7 @@ namespace Bot_Application1
                         {
                             string searchid = activity.Text.Trim("刪除預約".ToCharArray());
                             //reply.Text = SQLReserveTimeDelete(searchid);
-                            CreateButtonOne(reply,searchid);
+                            CreateButtonOne(reply, searchid);
                         }
                         else if (recent_day)
                         {
@@ -267,8 +298,23 @@ namespace Bot_Application1
                             string searchid = activity.Text.Trim("查詢本月指定使用者".ToCharArray());
                             string timefinish = DateTime.UtcNow.AddHours(32).ToShortDateString();
                             string timestart = DateTime.UtcNow.AddDays(-30).ToShortDateString();
-                            SQLCollectTimeName(timestart, timefinish, searchid,reply);
+                            SQLCollectTimeName(timestart, timefinish, searchid, reply);
                             //得到最近的時間
+                        }
+                        else if (upload)
+                        {
+                            string uploadname = activity.Text.Trim("上傳照片".ToCharArray());
+                            if(SQLSelectId(uploadname) != "error")
+                            {
+                                Guid guid = new Guid(SQLSelectId(uploadname));
+                                Global.P_id = guid;
+                                reply.Text = "please upload your picture";
+                            }
+                            else
+                            {
+                                reply.Text = "can't find user,please signup first.";
+                            }
+                            
                         }
                         else
                         {
@@ -283,6 +329,7 @@ namespace Bot_Application1
             var response = Request.CreateResponse(HttpStatusCode.OK);
             return response;
         }
+
 
         private void ImageTemplate(Activity reply, string url)
         {
@@ -301,6 +348,7 @@ namespace Bot_Application1
 
             reply.Attachments = att;
         }
+        
         private void CreateButtonOne(Activity reply,string name)
         {
             string del_time = SQLReserveTimeDeleteCheck(name);
@@ -491,7 +539,7 @@ namespace Bot_Application1
                 reply.Text = $"{ e.ToString()}";
             }
         }
-        private bool SQLReserveTimeNameCheck(string name)
+        private bool SQLUserNameCheck(string name)
         {
             try
             {
@@ -731,7 +779,7 @@ namespace Bot_Application1
 
 
         }
-        private void SQLNameRegister(string name, Activity reply)
+        private void SQLNameRegister(string name,string PersonID ,Activity reply)
         {
             try
             {
@@ -745,7 +793,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("INSERT INTO [dbo].[users]([NAME]) VALUES('"+name+"')");
+                    sb.Append("INSERT INTO [dbo].[users]([NAME],[PersonId]) VALUES('"+name+"','"+PersonID+"')");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -755,7 +803,7 @@ namespace Bot_Application1
                             {
                                 sqlresult.Append(reader.GetString(0));
                             }
-                            reply.Text = sqlresult.ToString();
+                            reply.Text = "create person sucess";
                         }
                     }
                     connection.Close();
@@ -763,13 +811,13 @@ namespace Bot_Application1
             }
             catch (SqlException e)
             {
-                reply.Text = $"{ e.ToString()}";
+                reply.Text = "create person failed";
             }
 
 
 
         }
-        private void SQLNameDelete(string name, Activity reply)
+        private string SQLSelectId(string name)
         {
             try
             {
@@ -783,7 +831,48 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = 'Ian') BEGIN SELECT 'True' END ELSE BEGIN SELECT 'False' END");
+                    sb.Append("IF EXISTS (SELECT Top 1 [PersonId] FROM [dbo].[users] WHERE Name = '"+name+"')" +
+                        "BEGIN SELECT Top 1 [PersonId] FROM [dbo].[users] WHERE Name = '" + name + "' END ELSE BEGIN SELECT 'error' END");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetString(0));
+
+                            }
+                            return sqlresult.ToString();
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                //reply.Text = $"{ e.ToString()}";
+                return "error";
+            }
+
+
+
+        }
+        private void SQLPersonDelete(string PersonID, Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("DELETE FROM [dbo].[users] WHERE PersonID = '"+PersonID+"'");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -793,7 +882,7 @@ namespace Bot_Application1
                             {
                                 sqlresult.Append(reader.GetString(0));
                             }
-                            reply.Text = sqlresult.ToString();
+                            reply.Text = "delete user sucess.";
                         }
                     }
                     connection.Close();
@@ -801,12 +890,15 @@ namespace Bot_Application1
             }
             catch (SqlException e)
             {
-                reply.Text = $"{ e.ToString()}";
+                reply.Text = "delete user failed";
+                //reply.Text = $"{ e.ToString()}";
             }
 
 
 
         }
+       
+        
 
     }
 }
