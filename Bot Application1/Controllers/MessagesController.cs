@@ -54,18 +54,39 @@ namespace Bot_Application1
                     ImageTemplate(reply, activity.Attachments.First().ContentUrl);
 
                 }
-                else if (activity.Text == "help")
+                else if (activity.Text == "help_user")
                 {
-                    reply.Text = "歡迎使用管理聊天機器人\n\n" +
-                        "如需新增使用者，請輸入\n\n「名稱+『欲使用名稱』」\n\n" +
-                        "例如:名稱王大明\n\n" +
-                        "\n\n如需查詢使用情況，請輸入\n\n" +
+                    reply.Text = 
+                        "1.新增使用者\n\n請輸入「新增名稱+『欲使用名稱』」\n\n" +
+                        "例如:新增名稱王大明\n\n" +
+                        "2.為使用者新增照片\n\n請輸入" +
+                        "「上傳照片+『使用者名稱』」\n\n" +
+                        "例如:上傳照片王大明\n\n" +
+                        "若出現請上傳照片，即可傳圖片上傳\n\n" +
+                        "3.刪除使用者\n\n請輸入「刪除使用者+『使用者名稱』」\n\n" +
+                        "例如:刪除使用者王大明\n\n" +
+                        "注意:刪除功能為不可逆功能。";
+                }
+                else if (activity.Text == "help_res")
+                {
+                    reply.Text =
+                        "1.如需預約，請輸入\n\n「名稱+@+開始時間+@+結束時間」\n\n" +
+                        "例如:名稱@王大明@2017/12/25-9:00@2017/12/25-10:00\n\n" +
+                        "注意:時間格式請以yy/mm/dd-HH:MM輸入\n\n預約時間亦不可超過五小時\n\n" +
+                        "如需超過五小時請分段預約\n\n" +
+                        "2.如需取消預約，請輸入\n\n" +
+                        "「刪除預約+名稱」\n\n" +
+                        "例如:刪除預約王大明\n\n";
+                        
+                }
+                else if (activity.Text == "help_search")
+                {
+                    reply.Text =
+                        "如需查詢使用紀錄\n\n" +
+                        "可使用此漢堡選單之快速查詢功能\n\n" +
+                        "如需查詢特定使用者使用紀錄\n\n請輸入" +
                         "「查詢+本日/本周/本月+指定使用者+『欲查詢名稱』」\n\n" +
-                        "例如:查詢本日指定使用者王大明\n\n" +
-                        "\n\n如需查詢指定小時前所有使用者，請輸入\n\n" +
-                        "「查詢幾小時前所有使用者+『欲查詢小時』\n\n" +
-                        "例如:查詢幾小時前使用者8\n\n" +
-                        "\n\n本聊天機器人由Godseye團隊製作。";
+                        "例如:查詢本日指定使用者王大明\n\n";
                 }
                 else if (activity.Text == "subscription")
                 {
@@ -136,12 +157,12 @@ namespace Bot_Application1
                                     AddPersistedFaceResult result_add = await client.AddPersonFaceAsync("security", result_Person, url);
                                     await client.TrainPersonGroupAsync("security");
                                     TrainingStatus result = await client.GetPersonGroupTrainingStatusAsync("security");
-                                    reply.Text = $"使用者pic已創立";
+                                    reply.Text = $"使用者照片已綁定";
                                    
                                 }
                                 catch (FaceAPIException f)
                                 {
-                                    reply.Text = "Pic error";
+                                    reply.Text = "照片無法辨識，請重新上傳臉部清晰照片";
                                 }
                                 //faceAPI
                             }
@@ -150,15 +171,8 @@ namespace Bot_Application1
 
 
                             }
-                            //if (fbData.postback.payload.StartsWith("Analyze>"))
-                            //{
-                            //    //辨識圖片
-                            //    VisionServiceClient client = new VisionServiceClient("88b8704fe3bd4483ac755befdc8624db", "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0");
-                            //    var result = await client.AnalyzeImageAsync(url, new VisualFeature[] { VisualFeature.Description });
-                            //    reply.Text = result.Description.Captions.First().Text;
-                            //}
                             else
-                                reply.Text = $"nope";
+                                reply.Text = $"無法辨識的指令，可使用下側選單選取幫助查詢指令";
                         }
                         else if (keyin)
                         {
@@ -196,6 +210,7 @@ namespace Bot_Application1
                                 try
                                 {
                                     await client.DeletePersonAsync("security", PersonID);
+                                    SQLDeleteRes(username);
                                     SQLPersonDelete(PersonID.ToString(), reply);
                                 }
                                 catch (FaceAPIException f)
@@ -214,7 +229,8 @@ namespace Bot_Application1
                         else if (Test)
                         {
                             string ChanData = activity.ChannelData.ToString();
-                            reply.Text = ChanData;
+                            dynamic json = JValue.Parse(ChanData);
+                            reply.Text = json.sender.id;
                         }
                         else if (res_time)
                         {
@@ -308,11 +324,11 @@ namespace Bot_Application1
                             {
                                 Guid guid = new Guid(SQLSelectId(uploadname));
                                 Global.P_id = guid;
-                                reply.Text = "please upload your picture";
+                                reply.Text = "請上傳照片";
                             }
                             else
                             {
-                                reply.Text = "can't find user,please signup first.";
+                                reply.Text = "無使用者資料，請先註冊";
                             }
                             
                         }
@@ -652,7 +668,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("INSERT INTO [dbo].[reservation]([Person],[StartTime],[EndTime]) VALUES('" + name + "', CONVERT(smalldatetime,'"+timestart+ "',110), CONVERT(smalldatetime,'"+timefinish+"',110))");
+                    sb.Append("INSERT INTO [dbo].[reservation]([Person],[StartTime],[EndTime]) VALUES(N'" + name + "', CONVERT(smalldatetime,'"+timestart+ "',110), CONVERT(smalldatetime,'"+timefinish+"',110))");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -691,7 +707,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("SELECT Top 5 * FROM [dbo].[reservation] WHERE Person = '"+name+"' AND StartTime >= DateAdd(HH, 8, Getdate()) ORDER BY StartTime");
+                    sb.Append("SELECT Top 5 * FROM [dbo].[reservation] WHERE Person = N'"+name+"' AND StartTime >= DateAdd(HH, 8, Getdate()) ORDER BY StartTime");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -793,7 +809,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("INSERT INTO [dbo].[users]([NAME],[PersonId]) VALUES('"+name+"','"+PersonID+"')");
+                    sb.Append("INSERT INTO [dbo].[users]([NAME],[PersonId]) VALUES(N'"+name+"','"+PersonID+"')");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -831,8 +847,8 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("IF EXISTS (SELECT Top 1 [PersonId] FROM [dbo].[users] WHERE Name = '"+name+"')" +
-                        "BEGIN SELECT Top 1 [PersonId] FROM [dbo].[users] WHERE Name = '" + name + "' END ELSE BEGIN SELECT 'error' END");
+                    sb.Append("IF EXISTS (SELECT Top 1 [PersonId] FROM [dbo].[users] WHERE Name = N'"+name+"')" +
+                        "BEGIN SELECT Top 1 [PersonId] FROM [dbo].[users] WHERE Name = N'" + name + "' END ELSE BEGIN SELECT 'error' END");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -897,8 +913,47 @@ namespace Bot_Application1
 
 
         }
-       
-        
+        private void SQLDeleteRes(string name)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("DELETE FROM [dbo].[reservation] WHERE PersonID = N'" +name+ "'");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetString(0));
+                            }
+                           
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                
+                //reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+
+
 
     }
 }
