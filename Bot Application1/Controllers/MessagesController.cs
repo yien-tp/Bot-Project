@@ -90,7 +90,9 @@ namespace Bot_Application1
                 }
                 else if (activity.Text == "subscription")
                 {
-                    reply.Text = "this is subscription";
+                    string ChanData = activity.ChannelData.ToString();
+                    dynamic json = JValue.Parse(ChanData);
+                    SQL_Fb_id(json.sender.id,reply);
                 }
                 else if (activity.Text == "last")
                 {
@@ -226,12 +228,12 @@ namespace Bot_Application1
                             //SQLDELETENAME select  personid where username == username
 
                         }
-                        else if (Test)
-                        {
-                            string ChanData = activity.ChannelData.ToString();
-                            dynamic json = JValue.Parse(ChanData);
-                            reply.Text = json.sender.id;
-                        }
+                        //else if (Test)
+                        //{
+                        //    string ChanData = activity.ChannelData.ToString();
+                        //    dynamic json = JValue.Parse(ChanData);
+                        //    reply.Text = json.sender.id;
+                        //}
                         else if (res_time)
                         {
                             string searchid = activity.Text.Trim("預約".ToCharArray());
@@ -518,7 +520,7 @@ namespace Bot_Application1
                     sb.Append(timestart);
                     sb.Append("', 110) and detecttime <= CONVERT(datetime,'");
                     sb.Append(timefinish);
-                    sb.Append("', 110) and Person = '"+name+"' ORDER BY detecttime DESC ");
+                    sb.Append("', 110) and Person = N'"+name+"' ORDER BY detecttime DESC ");
                     //sb.Append("SELECT * FROM [dbo].[detect] WHERE Person = '"+name+"' ORDER BY detecttime DESC");
                     /*sb.Append("FROM [SalesLT].[ProductCategory] pc ");
                     sb.Append("JOIN [SalesLT].[Product] p ");
@@ -569,7 +571,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = '"+name+"') BEGIN " +
+                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[users] WHERE Name = N'"+name+"') BEGIN " +
                         "SELECT 'True' END ELSE BEGIN SELECT 'False' END");
 
                     String sql = sb.ToString();
@@ -668,7 +670,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("INSERT INTO [dbo].[reservation]([Person],[StartTime],[EndTime]) VALUES(N'" + name + "', CONVERT(smalldatetime,'"+timestart+ "',110), CONVERT(smalldatetime,'"+timefinish+"',110))");
+                    sb.Append("INSERT INTO [dbo].[reservation]([Person],[StartTime],[EndTime]) VALUES(N'"+ name +"', CONVERT(smalldatetime,'"+timestart+ "',110), CONVERT(smalldatetime,'"+timefinish+"',110))");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -927,7 +929,7 @@ namespace Bot_Application1
                 {
                     connection.Open();
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("DELETE FROM [dbo].[reservation] WHERE PersonID = N'" +name+ "'");
+                    sb.Append("DELETE FROM [dbo].[reservation] WHERE Person = N'" +name+ "'");
                     String sql = sb.ToString();
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
@@ -946,6 +948,46 @@ namespace Bot_Application1
             catch (SqlException e)
             {
                 
+                //reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+        private void SQL_Fb_id(dynamic fb_id, Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("IF NOT EXISTS(SELECT 1 FROM [dbo].[subscribe] WHERE fb_id = '"+fb_id+"')" +
+                        "BEGIN INSERT INTO [dbo].[subscribe]([fb_id]) VALUES('"+fb_id+"') END");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetString(0));
+                            }
+                            reply.Text = "訂閱成功";
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                reply.Text = "訂閱失敗，稍後再試。";
                 //reply.Text = $"{ e.ToString()}";
             }
 
