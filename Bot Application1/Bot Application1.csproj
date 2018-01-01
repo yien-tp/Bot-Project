@@ -143,6 +143,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
+    <None Include="Properties\PublishProfiles\bot-mrl - FTP.pubxml" />
+    <None Include="Properties\PublishProfiles\bot-mrl - Web Deploy.pubxml" />
     <None Include="Properties\PublishProfiles\botdemo070 - Web Deploy.pubxml" />
     <None Include="Properties\PublishProfiles\botmrl - Web Deploy.pubxml" />
     <None Include="Web.Debug.config">

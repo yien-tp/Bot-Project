@@ -2,25 +2,17 @@
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
-using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
 using Newtonsoft.Json;
-using System.Diagnostics;
-using System.Web.Services.Description;
 using System.Linq;
 using System;
 using System.Collections.Generic;
 using BotCampDemo.Model;
-using Microsoft.ProjectOxford.Vision;
-using Microsoft.Cognitive.LUIS;
 using Microsoft.ProjectOxford.Face;
-using Microsoft.ProjectOxford.Vision.Contract;
 using Newtonsoft.Json.Linq;
 using Microsoft.ProjectOxford.Face.Contract;
-using System.Threading;
 using System.Data.SqlClient;
 using System.Text;
-using System.Data;
 
 namespace Bot_Application1
 {
@@ -94,6 +86,12 @@ namespace Bot_Application1
                     dynamic json = JValue.Parse(ChanData);
                     SQL_Fb_id(json.sender.id,reply);
                 }
+                else if (activity.Text == "del_subscription")
+                {
+                    string ChanData = activity.ChannelData.ToString();
+                    dynamic json = JValue.Parse(ChanData);
+                    SQL_Fb_id_del(json.sender.id, reply);
+                }
                 else if (activity.Text == "last")
                 {
                     SQLCollectTimeOne(reply);
@@ -154,7 +152,7 @@ namespace Bot_Application1
                             {
                                 try
                                 {
-                                    FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
+                                    FaceServiceClient client = new FaceServiceClient("0457ebf8921c442594bf82f0ed8fded7", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
                                     Guid result_Person = Global.P_id;
                                     AddPersistedFaceResult result_add = await client.AddPersonFaceAsync("security", result_Person, url);
                                     await client.TrainPersonGroupAsync("security");
@@ -183,7 +181,7 @@ namespace Bot_Application1
                             {
                                 try
                                 {
-                                    FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
+                                    FaceServiceClient client = new FaceServiceClient("0457ebf8921c442594bf82f0ed8fded7", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
                                     CreatePersonResult result_Person = await client.CreatePersonAsync("security", Global.userid);
                                     Global.P_id = result_Person.PersonId;
                                     SQLNameRegister(Global.userid, result_Person.PersonId.ToString(), reply);
@@ -208,7 +206,7 @@ namespace Bot_Application1
                             Guid PersonID = new Guid(SQLSelectId(username));
                             if (SQLSelectId(username) != "error")
                             {
-                                FaceServiceClient client = new FaceServiceClient("6ef41877566d45d68b93b527f187fbfa", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
+                                FaceServiceClient client = new FaceServiceClient("0457ebf8921c442594bf82f0ed8fded7", "https://westcentralus.api.cognitive.microsoft.com/face/v1.0");
                                 try
                                 {
                                     await client.DeletePersonAsync("security", PersonID);
@@ -228,12 +226,6 @@ namespace Bot_Application1
                             //SQLDELETENAME select  personid where username == username
 
                         }
-                        //else if (Test)
-                        //{
-                        //    string ChanData = activity.ChannelData.ToString();
-                        //    dynamic json = JValue.Parse(ChanData);
-                        //    reply.Text = json.sender.id;
-                        //}
                         else if (res_time)
                         {
                             string searchid = activity.Text.Trim("預約".ToCharArray());
@@ -402,7 +394,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -449,7 +441,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -507,7 +499,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -562,7 +554,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -607,7 +599,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -661,7 +653,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -700,7 +692,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -751,7 +743,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -802,7 +794,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -840,7 +832,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -881,7 +873,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -920,7 +912,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -959,7 +951,7 @@ namespace Bot_Application1
             try
             {
                 SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
-                builder.DataSource = "mrlsql.database.windows.net";
+                builder.DataSource = "mrlsql-1.database.windows.net";
                 builder.UserID = "mrlsql";
                 builder.Password = "MRL666@mrl";
                 builder.InitialCatalog = "mrlsql";
@@ -988,6 +980,46 @@ namespace Bot_Application1
             catch (SqlException e)
             {
                 reply.Text = "訂閱失敗，稍後再試。";
+                //reply.Text = $"{ e.ToString()}";
+            }
+
+
+
+        }
+        private void SQL_Fb_id_del(dynamic fb_id, Activity reply)
+        {
+            try
+            {
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+                builder.DataSource = "mrlsql-1.database.windows.net";
+                builder.UserID = "mrlsql";
+                builder.Password = "MRL666@mrl";
+                builder.InitialCatalog = "mrlsql";
+                StringBuilder sqlresult = new StringBuilder();
+                using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+                {
+                    connection.Open();
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("IF EXISTS(SELECT 1 FROM [dbo].[subscribe] WHERE fb_id = '" + fb_id + "')" +
+                        "BEGIN DELETE FROM [dbo].[subscribe]  WHERE fb_id ='" + fb_id + "' END");
+                    String sql = sb.ToString();
+                    using (SqlCommand command = new SqlCommand(sql, connection))
+                    {
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                sqlresult.Append(reader.GetString(0));
+                            }
+                            reply.Text = "取消訂閱成功";
+                        }
+                    }
+                    connection.Close();
+                }
+            }
+            catch (SqlException e)
+            {
+                reply.Text = "取消訂閱失敗，稍後再試。";
                 //reply.Text = $"{ e.ToString()}";
             }
 
